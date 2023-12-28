@@ -1,34 +1,32 @@
 // server.js
-const path = require("path");
-require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 const cors = require("cors");
 
+// Load environment variables from .env file
+require("dotenv").config();
+
 const PORT = process.env.PORT || 5000;
 const app = express();
 
-// Enable CORS
+// Enable CORS to allow cross-origin requests
 app.use(cors());
 
-// Serve static files from the React app
-// app.use(express.static(path.join(__dirname, 'client/build')));
-
-// Handle requests to any unknown route by serving the React app
+// Serve a simple HTML response for the /api route
 app.get("/api", (req, res) => {
-  // res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-  res.send("<h1>Hello</h1>");
+  res.send("<h4>Api Working Fine...</h4>");
 });
 
-// Add this route to get all users
-app.get('/api/get-all-users', async (req, res) => {
+// API route to get all users
+app.get("/api/get-all-users", async (req, res) => {
   try {
+    // Retrieve all users from the MongoDB database
     const users = await User.find();
     res.status(200).json(users);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -46,22 +44,23 @@ const User = mongoose.model("User", {
   name: String,
   email: String,
   jobDescription: String,
+  selectedDate: Date,
 });
 
-// Middleware to parse JSON data
+// Middleware to parse incoming JSON data
 app.use(express.json());
 
 // API endpoint to save user information
 app.post("/api/save-user", async (req, res) => {
   try {
-    const { name, email, jobDescription } = req.body;
-    console.log(req.body);
+    // Extract user information from the request body
+    const { name, email, jobDescription, selectedDate } = req.body;
 
     // Save user information to MongoDB
-    const user = new User({ name, email, jobDescription });
+    const user = new User({ name, email, jobDescription, selectedDate });
     await user.save();
 
-    // Send confirmation email using Node Mailer
+    // Send a confirmation email using Node Mailer
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -85,16 +84,49 @@ app.post("/api/save-user", async (req, res) => {
       }
     });
 
+    // Send a JSON response indicating success
     res
       .status(200)
       .json({ message: "User information saved and email sent successfully." });
+  } catch (error) {
+    console.error(error);
+    // Send a JSON response indicating an internal server error
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Add this route to delete a user by ID
+app.delete("/api/delete-user/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    await User.findByIdAndDelete(userId);
+    res.status(200).json({ message: "User deleted successfully." });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// Start the server
+// API endpoint for admin login
+app.post("/api/admin-login", async (req, res) => {
+  try {
+    const { name, email } = req.body;
+
+    // Check if admin's name and email exist in the database
+    const admin = await User.findOne({ name, email });
+
+    if (admin) {
+      res.status(200).json({ success: true });
+    } else {
+      res.status(200).json({ success: false });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Start the server and listen on the specified port
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
